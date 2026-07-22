@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#6366f1" />
+<title>TradeHub | Equity, Bond &amp; Options Dashboard</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<div id="topbar">
+  <button id="menuToggle" class="icon-btn" aria-label="Toggle menu">&#9776;</button>
+  <div class="brand"><span class="brand-mark">TH</span><span class="brand-name">TradeHub</span></div>
+  <div class="topbar-search">
+    <input type="text" placeholder="Search symbol, bond, or strategy&hellip;" />
+  </div>
+  <div class="topbar-right">
+    <span id="liveBadge" class="badge badge-demo">DEMO DATA</span>
+    <span id="clock" class="clock">--:--:--</span>
+    <div class="avatar" title="Gnanasekar">G</div>
+  </div>
+</div>
+
+<div id="shell">
+  <nav id="sidebar">
+    <button class="nav-item active" data-page="dashboard">
+      <span class="nav-icon">&#9673;</span> Dashboard
+    </button>
+    <button class="nav-item" data-page="screener">
+      <span class="nav-icon">&#9776;</span> Equity Screener
+    </button>
+    <button class="nav-item" data-page="options">
+      <span class="nav-icon">&#8801;</span> Option Chain
+    </button>
+    <button class="nav-item" data-page="bonds">
+      <span class="nav-icon">&#9670;</span> Bonds &amp; Portfolio
+    </button>
+    <div class="nav-footer">
+      <div class="nav-footer-title">Coming soon</div>
+      <div class="nav-footer-item">Alerts &amp; scans</div>
+      <div class="nav-footer-item">Broker sync</div>
+      <div class="nav-footer-item">Backtesting</div>
+    </div>
+  </nav>
+
+  <main id="content">
+    <section id="page-dashboard" class="page active"></section>
+    <section id="page-screener" class="page"></section>
+    <section id="page-options" class="page"></section>
+    <section id="page-bonds" class="page"></section>
+  </main>
+</div>
+<div id="sidebar-overlay"></div>
+
+<script src="data.js"></script>
+<script src="marketdata.js"></script>
+<script src="charts.js"></script>
+<script src="dashboard.js"></script>
+<script src="screener.js"></script>
+<script src="options.js"></script>
+<script src="bonds.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
