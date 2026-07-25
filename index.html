@@ -9,50 +9,70 @@
 </head>
 <body>
 
-<div id="topbar">
-  <button id="menuToggle" class="icon-btn" aria-label="Toggle menu">&#9776;</button>
-  <div class="brand"><span class="brand-mark">TH</span><span class="brand-name">TradeHub</span></div>
-  <div class="topbar-search">
-    <input type="text" placeholder="Search symbol, bond, or strategy&hellip;" />
-  </div>
-  <div class="topbar-right">
-    <span id="liveBadge" class="badge badge-demo">DEMO DATA</span>
-    <span id="clock" class="clock">--:--:--</span>
-    <div class="avatar" title="Gnanasekar">G</div>
-  </div>
-</div>
+<div id="authScreen"></div>
 
-<div id="shell">
-  <nav id="sidebar">
-    <button class="nav-item active" data-page="dashboard">
-      <span class="nav-icon">&#9673;</span> Dashboard
-    </button>
-    <button class="nav-item" data-page="screener">
-      <span class="nav-icon">&#9776;</span> Equity Screener
-    </button>
-    <button class="nav-item" data-page="options">
-      <span class="nav-icon">&#8801;</span> Option Chain
-    </button>
-    <button class="nav-item" data-page="bonds">
-      <span class="nav-icon">&#9670;</span> Bonds &amp; Portfolio
-    </button>
-    <div class="nav-footer">
-      <div class="nav-footer-title">Coming soon</div>
-      <div class="nav-footer-item">Alerts &amp; scans</div>
-      <div class="nav-footer-item">Broker sync</div>
-      <div class="nav-footer-item">Backtesting</div>
+<div id="appRoot" style="display:none;">
+  <div id="topbar">
+    <button id="menuToggle" class="icon-btn" aria-label="Toggle menu">&#9776;</button>
+    <div class="brand"><span class="brand-mark">TH</span><span class="brand-name">TradeHub</span></div>
+    <div class="topbar-search">
+      <input type="text" placeholder="Search symbol, bond, or strategy&hellip;" />
     </div>
-  </nav>
+    <div class="topbar-right">
+      <span id="liveBadge" class="badge badge-demo">DEMO DATA</span>
+      <span id="clock" class="clock">--:--:--</span>
+      <div class="user-menu">
+        <div class="avatar" id="userAvatar" title="">?</div>
+        <div class="user-menu-dropdown" id="userMenuDropdown">
+          <div class="user-menu-email" id="userMenuEmail"></div>
+          <button class="user-menu-signout" id="signOutBtn">Sign out</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <main id="content">
-    <section id="page-dashboard" class="page active"></section>
-    <section id="page-screener" class="page"></section>
-    <section id="page-options" class="page"></section>
-    <section id="page-bonds" class="page"></section>
-  </main>
+  <div id="shell">
+    <nav id="sidebar">
+      <button class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">&#9673;</span> Dashboard
+      </button>
+      <button class="nav-item" data-page="screener">
+        <span class="nav-icon">&#9776;</span> Equity Screener
+      </button>
+      <button class="nav-item" data-page="options">
+        <span class="nav-icon">&#8801;</span> Option Chain
+      </button>
+      <button class="nav-item" data-page="bonds">
+        <span class="nav-icon">&#9670;</span> Bonds &amp; Portfolio
+      </button>
+      <button class="nav-item" data-page="scan52w">
+        <span class="nav-icon">&#9650;</span> 52W High Scanner
+      </button>
+      <div class="nav-footer">
+        <div class="nav-footer-title">Coming soon</div>
+        <div class="nav-footer-item">Alerts &amp; scans</div>
+        <div class="nav-footer-item">Broker sync</div>
+        <div class="nav-footer-item">Backtesting</div>
+      </div>
+    </nav>
+
+    <main id="content">
+      <section id="page-dashboard" class="page active"></section>
+      <section id="page-screener" class="page"></section>
+      <section id="page-options" class="page"></section>
+      <section id="page-bonds" class="page"></section>
+      <section id="page-scan52w" class="page"></section>
+    </main>
+  </div>
+  <div id="sidebar-overlay"></div>
 </div>
-<div id="sidebar-overlay"></div>
 
+<!-- Supabase JS client (auth + database), loaded from CDN — no build step needed -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script src="auth-config.js"></script>
+<script src="auth.js"></script>
+<script src="auth-ui.js"></script>
 <script src="data.js"></script>
 <script src="marketdata.js"></script>
 <script src="charts.js"></script>
@@ -60,6 +80,7 @@
 <script src="screener.js"></script>
 <script src="options.js"></script>
 <script src="bonds.js"></script>
+<script src="scan52w.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

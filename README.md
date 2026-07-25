@@ -24,6 +24,7 @@ Then open the printed local address.
 - **Equity Screener** — sortable, filterable table (sector, stage, RS rating, watchlist star) over a sample 18-stock universe.
 - **Option Chain & Analytics** — synthetic option chain per underlying (NIFTY/BANKNIFTY/RELIANCE/TCS), PCR, and an interactive single-leg payoff diagram.
 - **Bonds & Portfolio** — bond tracker table, a YTM calculator, and a cross-asset (equity/bond/option) holdings table with P&L and allocation chart.
+- **52-Week High Scanner** — screens a 50-stock NSE universe for stocks at/near their 52-week high, scored on 3 live technical parameters (% from 52W high, RS score vs. the universe, volume surge) computed from real Yahoo Finance price history, plus 2 demo fundamental parameters (ROE, YoY profit growth).
 
 ## Live data
 
@@ -44,8 +45,11 @@ does with `TH.marketData.pollQuotes`.
 ## Project structure
 
 ```
-index.html      Shell: topbar, sidebar nav, one <section> per page
-styles.css       Dark theme, shared card/table/form styles
+index.html       Shell: auth screen + topbar/sidebar/pages, all <script> tags in load order
+styles.css       Dark theme, shared card/table/form styles, auth screen + user menu styles
+auth-config.js   Your Supabase project URL + anon key go here
+auth.js          Thin wrapper around Supabase Auth (TH.auth)
+auth-ui.js       Login/sign-up screen UI (TH.authUI)
 data.js          Demo/fallback data + shared formatting utilities (TH.util)
 marketdata.js    Live quote fetching with fallback (TH.marketData)
 charts.js        Tiny dependency-free SVG chart helpers (TH.charts)
@@ -53,8 +57,34 @@ dashboard.js     Dashboard page module (TH.pages.dashboard)
 screener.js      Equity screener page module (TH.pages.screener)
 options.js       Option chain & payoff page module (TH.pages.options)
 bonds.js         Bonds + portfolio page module (TH.pages.bonds)
-app.js           Routing between pages, sidebar/topbar behavior
+scan52w.js       52-Week High Scanner page module (TH.pages.scan52w)
+app.js           Auth gating, routing between pages, sidebar/topbar behavior
 ```
+
+## Authentication setup (email + Google sign-in)
+
+Sign-in is required to see the dashboard, backed by [Supabase Auth](https://supabase.com) —
+free tier, no server of your own needed, works fine from a static GitHub Pages site. Until
+you configure it, the app shows a "continue without signing in" screen instead of hard-locking
+you out.
+
+**1. Create the Supabase project**
+- Go to supabase.com → sign in → "New project." Pick a name, a database password (save it somewhere), and a region. Wait ~2 minutes for it to provision.
+- Project Settings → API. Copy the **Project URL** and the **anon public** key (not the `service_role` key — that one must never go in frontend code).
+- Paste both into `auth-config.js` in place of the `YOUR_...` placeholders.
+
+**2. Email sign-in** is on by default (Authentication → Providers → Email). Optionally turn off "Confirm email" there if you want new sign-ups to be usable immediately instead of requiring an email click first — fine for testing, turn it back on before real users sign up.
+
+**3. Google sign-in** needs a Google OAuth client:
+- In Supabase: Authentication → Providers → Google → toggle it on. It shows you a **Callback URL** like `https://<project-ref>.supabase.co/auth/v1/callback` — copy it.
+- In [Google Cloud Console](https://console.cloud.google.com/apis/credentials): create a project (or use one), configure the OAuth consent screen (External, add your email as a test user while in testing mode), then create an **OAuth client ID** of type "Web application." Paste the Supabase callback URL into "Authorized redirect URIs."
+- Copy the generated **Client ID** and **Client Secret** back into the Supabase Google provider settings and save.
+
+**4. Set your site URL** in Supabase: Authentication → URL Configuration → Site URL = your GitHub Pages URL (`https://<your-username>.github.io/tradehub/`). Add the same under "Redirect URLs." Without this, Google sign-in will redirect back to the wrong place.
+
+**5. Commit and push** `auth-config.js` with your real values — the anon key is meant to be public (Supabase's Row Level Security is what actually protects data, not hiding this key).
+
+Once that's done, reload the GitHub Pages site: you'll get a real sign-up/sign-in screen, a Google button, and a signed-in user's email + a sign-out control in the top-right avatar menu.
 
 ## Adding a new page/feature
 

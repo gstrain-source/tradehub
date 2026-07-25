@@ -102,9 +102,90 @@ window.TH = window.TH || {};
     };
   }
 
+  /* ---- Historical candles (52-week high/low, avg volume, medium-term return) ----
+     Used by the 52-Week High Scanner. We pull ~1 year of weekly candles rather than daily —
+     plenty of resolution for 52w high/low and a 6-month return, at a fraction of the payload
+     of 250+ daily bars across dozens of symbols. */
+
+  function parseYahooHistory(json, symbol) {
+    const result = json && json.chart && json.chart.result && json.chart.result[0];
+    if (!result || !result.timestamp || !result.indicators || !result.indicators.quote || !result.indicators.quote[0]) return null;
+    const q = result.indicators.quote[0];
+    const closes = (q.close || []).filter((v) => v != null);
+    const highs = (q.high || []).filter((v) => v != null);
+    const lows = (q.low || []).filter((v) => v != null);
+    const volumes = (q.volume || []).filter((v) => v != null);
+    if (!closes.length) return null;
+
+    const currentPrice = closes[closes.length - 1];
+    const high52w = Math.max.apply(null, highs.length ? highs : closes);
+    const low52w = Math.min.apply(null, lows.length ? lows : closes);
+    const latestVolume = volumes.length ? volumes[volumes.length - 1] : null;
+    const avgVolume = volumes.length ? volumes.reduce((s, v) => s + v, 0) / volumes.length : null;
+
+    // Roughly the midpoint of the returned series ≈ 6 months back, for a medium-term return.
+    const midIndex = Math.max(0, closes.length - Math.round(closes.length / 2) - 1);
+    const price6mAgo = closes[midIndex];
+    const return6m = price6mAgo ? ((currentPrice - price6mAgo) / price6mAgo) * 100 : null;
+
+    return { symbol, currentPrice, high52w, low52w, latestVolume, avgVolume, return6m, live: true };
+  }
+
+  async function fetchYahooHistory(symbol, opts) {
+    opts = opts || {};
+    const range = opts.range || "1y";
+    const interval = opts.interval || "1wk";
+    const url = YAHOO_CHART + encodeURIComponent(symbol) + "?range=" + range + "&interval=" + interval;
+    try {
+      const res = await fetchWithTimeout(url, TIMEOUT_MS);
+      if (!res.ok) throw new Error("bad response " + res.status);
+      const json = await res.json();
+      const parsed = parseYahooHistory(json, symbol);
+      if (parsed) return parsed;
+      throw new Error("unparsable history");
+    } catch (directErr) {
+      try {
+        const res = await fetchWithTimeout(CORS_RELAY + encodeURIComponent(url), TIMEOUT_MS + 3000);
+        if (!res.ok) throw new Error("relay bad response " + res.status);
+        const json = await res.json();
+        return parseYahooHistory(json, symbol);
+      } catch (relayErr) {
+        return null;
+      }
+    }
+  }
+
+  /**
+   * Fetch history for many symbols with bounded concurrency (be polite to Yahoo/the relay).
+   * onProgress(done, total) fires after each completion. Returns results in the same order as symbols
+   * (each entry is a parsed history object or null if that symbol failed on both attempts).
+   */
+  async function fetchHistoryBatch(symbols, concurrency, onProgress) {
+    concurrency = concurrency || 6;
+    const results = new Array(symbols.length);
+    let next = 0;
+    let done = 0;
+
+    async function worker() {
+      while (next < symbols.length) {
+        const i = next++;
+        results[i] = await fetchYahooHistory(symbols[i]);
+        done++;
+        if (onProgress) onProgress(done, symbols.length);
+      }
+    }
+
+    const workers = [];
+    for (let i = 0; i < Math.min(concurrency, symbols.length); i++) workers.push(worker());
+    await Promise.all(workers);
+    return results;
+  }
+
   TH.marketData = {
     fetchYahooQuote: fetchYahooQuote,
     fetchQuotes: fetchQuotes,
-    pollQuotes: pollQuotes
+    pollQuotes: pollQuotes,
+    fetchYahooHistory: fetchYahooHistory,
+    fetchHistoryBatch: fetchHistoryBatch
   };
 })();
