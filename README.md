@@ -1,7 +1,7 @@
 # TradeHub
 
-A base dashboard for an equity, bond & options trading platform, styled after WealthLab's
-dark, widget-driven layout. Built as a dependency-free static site (plain HTML/CSS/JS) so it
+A base dashboard for an equity, bond & options trading platform, styled as a dark,
+widget-driven layout. Built as a dependency-free static site (plain HTML/CSS/JS) so it
 runs anywhere with zero build step, and is structured so new features are easy to bolt on.
 
 ## Running it
@@ -24,7 +24,7 @@ Then open the printed local address.
 - **Equity Screener** — sortable, filterable table (sector, stage, RS rating, watchlist star) over a sample 18-stock universe.
 - **Option Chain & Analytics** — synthetic option chain per underlying (NIFTY/BANKNIFTY/RELIANCE/TCS), PCR, and an interactive single-leg payoff diagram.
 - **Bonds & Portfolio** — bond tracker table, a YTM calculator, and a cross-asset (equity/bond/option) holdings table with P&L and allocation chart.
-- **52-Week High Scanner** — screens a 50-stock NSE universe for stocks at/near their 52-week high, scored on 3 live technical parameters (% from 52W high, RS score vs. the universe, volume surge) computed from real Yahoo Finance price history, plus 2 demo fundamental parameters (ROE, YoY profit growth). Auto-scans on first visit and caches results; flags genuine breakouts (NEW HIGH — price above every prior high in the window, not just sitting near an old peak) with a filter for "fresh breakouts only"; click a row to expand a live mini price chart plus extra context (52W low, debt/equity, P/E, sales growth, 6-month return).
+- **52-Week High Scanner** — two modes. **Quick Scan** screens a 50-stock NSE sample live in your browser (auto-runs on first visit), approximating the 52-week high/breakout itself from ~1y of Yahoo Finance price history, scored on 3 technical parameters (% from 52W high, RS score vs. the sample, volume surge) plus 2 demo fundamental parameters (ROE, YoY profit growth); click a row to expand a live mini price chart. **Full NSE** reads NSE's *own* daily "new 52-week high" feed (the API behind nseindia.com's 52-week-high page) via a scheduled Supabase Edge Function — every row is a real, NSE-confirmed new high across the whole market, not an approximation, including how far today's high beat the prior one. See `supabase-scan52w/README.md` to deploy it (optional; Quick Scan needs no setup).
 
 ## Live data
 
@@ -57,8 +57,13 @@ dashboard.js     Dashboard page module (TH.pages.dashboard)
 screener.js      Equity screener page module (TH.pages.screener)
 options.js       Option chain & payoff page module (TH.pages.options)
 bonds.js         Bonds + portfolio page module (TH.pages.bonds)
-scan52w.js       52-Week High Scanner page module (TH.pages.scan52w)
+scan52w.js       52-Week High Scanner page module (TH.pages.scan52w) — Quick Scan + Full NSE modes
 app.js           Routing between pages, sidebar/topbar behavior, optional auth modal wiring
+
+supabase-scan52w/                    Optional backend for the Full NSE scan mode (not needed for Quick Scan)
+  supabase/config.toml                Marks this as the Supabase CLI project root
+  supabase/migrations/*.sql           Creates the scan_results table
+  supabase/functions/scan-52w-high/   Deno Edge Function: reads NSE's own daily new-high feed, see its README to deploy
 ```
 
 ## Authentication setup (optional — email/password + Google)

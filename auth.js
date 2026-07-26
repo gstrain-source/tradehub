@@ -71,6 +71,14 @@ window.TH = window.TH || {};
     return function unsubscribe() { data.subscription.unsubscribe(); };
   }
 
+  /** Raw Supabase client, for pages that need to query public tables directly (e.g. the
+      52-Week High Scanner's "Full NSE" mode reading public.scan_results). Returns null if
+      auth isn't configured. Only use this for public-read tables — anything writable should
+      go through a proper RLS-protected path or a server-side function, not the anon client. */
+  function getClient() {
+    return client;
+  }
+
   TH.auth = {
     isConfigured,
     signUpWithEmail,
@@ -78,6 +86,7 @@ window.TH = window.TH || {};
     signInWithGoogle,
     signOut,
     getSession,
-    onAuthStateChange
+    onAuthStateChange,
+    getClient
   };
 })();
