@@ -11,7 +11,7 @@
 
 <div id="authScreen"></div>
 
-<div id="appRoot" style="display:none;">
+<div id="appRoot">
   <div id="topbar">
     <button id="menuToggle" class="icon-btn" aria-label="Toggle menu">&#9776;</button>
     <div class="brand"><span class="brand-mark">TH</span><span class="brand-name">TradeHub</span></div>
@@ -21,7 +21,8 @@
     <div class="topbar-right">
       <span id="liveBadge" class="badge badge-demo">DEMO DATA</span>
       <span id="clock" class="clock">--:--:--</span>
-      <div class="user-menu">
+      <button class="btn btn-ghost" id="signInBtn" style="display:none;">Sign in</button>
+      <div class="user-menu" id="userMenuWrap" style="display:none;">
         <div class="avatar" id="userAvatar" title="">?</div>
         <div class="user-menu-dropdown" id="userMenuDropdown">
           <div class="user-menu-email" id="userMenuEmail"></div>

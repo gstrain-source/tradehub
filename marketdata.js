@@ -128,7 +128,10 @@ window.TH = window.TH || {};
     const price6mAgo = closes[midIndex];
     const return6m = price6mAgo ? ((currentPrice - price6mAgo) / price6mAgo) * 100 : null;
 
-    return { symbol, currentPrice, high52w, low52w, latestVolume, avgVolume, return6m, live: true };
+    return {
+      symbol, currentPrice, high52w, low52w, latestVolume, avgVolume, return6m, live: true,
+      closes: closes, highs: highs // raw series, for breakout detection & mini price charts
+    };
   }
 
   async function fetchYahooHistory(symbol, opts) {

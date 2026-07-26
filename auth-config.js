@@ -9,6 +9,6 @@
 window.TH = window.TH || {};
 
 TH.authConfig = {
-  supabaseUrl: "https://hhvtlzrvvarytohmxqld.supabase.co",     // e.g. "https://abcdefghijk.supabase.co"
+  supabaseUrl: "https://supabase.com/dashboard/project/hhvtlzrvvarytohmxqld",     // e.g. "https://abcdefghijk.supabase.co"
   supabaseAnonKey: "sb_publishable_vJ71VKpABwxK_iFnMkeqgQ_7ROuXf-u"
 };

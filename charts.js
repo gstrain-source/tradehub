@@ -107,5 +107,41 @@ window.TH = window.TH || {};
     container.appendChild(root);
   }
 
-  TH.charts = { stackedBar: stackedBar, donut: donut, lineChart: lineChart };
+  /** Simple price line chart (no zero-crossing coloring — just a trend line + area fill),
+      with an optional dashed reference line (e.g. the 52-week high). points: [{y}] in order. */
+  function priceLine(container, points, opts) {
+    opts = opts || {};
+    const width = opts.width || container.clientWidth || 480;
+    const height = opts.height || 140;
+    const pad = 24;
+    if (!points.length) { container.innerHTML = ""; return; }
+
+    const ys = points.map((p) => p.y);
+    const yMin = Math.min.apply(null, ys);
+    const yMax = Math.max.apply(null, opts.refValue != null ? ys.concat([opts.refValue]) : ys);
+    const n = points.length;
+    const sx = (i) => pad + (i / (n - 1 || 1)) * (width - pad * 2);
+    const sy = (y) => height - pad - ((y - yMin) / ((yMax - yMin) || 1)) * (height - pad * 2);
+
+    const root = svg("svg", { width: "100%", height: height, viewBox: "0 0 " + width + " " + height });
+
+    if (opts.refValue != null) {
+      const ry = sy(opts.refValue);
+      root.appendChild(svg("line", { x1: pad, y1: ry, x2: width - pad, y2: ry, stroke: "#f0b90b", "stroke-width": 1, "stroke-dasharray": "4,4" }));
+    }
+
+    let areaD = "M " + sx(0) + " " + sy(yMin);
+    for (let i = 0; i < n; i++) areaD += " L " + sx(i) + " " + sy(points[i].y);
+    areaD += " L " + sx(n - 1) + " " + sy(yMin) + " Z";
+    root.appendChild(svg("path", { d: areaD, fill: opts.fill || "#6366f11f", stroke: "none" }));
+
+    let lineD = "M " + sx(0) + " " + sy(points[0].y);
+    for (let i = 1; i < n; i++) lineD += " L " + sx(i) + " " + sy(points[i].y);
+    root.appendChild(svg("path", { d: lineD, fill: "none", stroke: opts.stroke || "#818cf8", "stroke-width": 2 }));
+
+    container.innerHTML = "";
+    container.appendChild(root);
+  }
+
+  TH.charts = { stackedBar: stackedBar, donut: donut, lineChart: lineChart, priceLine: priceLine };
 })();

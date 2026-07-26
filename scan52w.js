@@ -1,11 +1,16 @@
 /* TradeHub — 52-Week High Scanner.
-   Screens TH.data.scanUniverse (~50 NSE large/mid-caps) for stocks trading at or near their
-   52-week high, scored on 5 parameters:
+
+   Classic "52-week-high momentum" strategy: stocks making fresh 52-week highs tend to keep
+   outperforming for a while (the market underreacts to good news near old highs — George &
+   Hwang's 52-week-high effect). This page screens TH.data.scanUniverse (~50 NSE large/mid-caps)
+   for stocks at/near their 52-week high and flags genuine breakouts, scored on 5 parameters:
 
      Technical (computed live from ~1y of Yahoo Finance weekly candles):
        1. % From 52-Week High  — how close the current price is to its 52w high
        2. RS Score             — percentile rank of 6-month price return within this universe
        3. Volume Surge         — latest volume vs. this stock's own 1y average volume
+     A stock is also flagged NEW HIGH when its latest price exceeds every prior high in the
+     fetched window — i.e. it just broke out, not just sitting near an old peak.
 
      Fundamental (demo — see note below):
        4. ROE %
@@ -43,8 +48,11 @@ TH.pages = TH.pages || {};
     lastScanAt: null,
     threshold: "5",
     sector: "All",
+    newHighOnly: false,
     sortKey: "compositeScore",
-    sortDir: "desc"
+    sortDir: "desc",
+    expanded: null,
+    autoScanTried: false
   };
 
   function demoFundamentals(symbol) {
@@ -64,7 +72,7 @@ TH.pages = TH.pages || {};
     if (wl) {
       return {
         currentPrice: wl.ltp, high52w: wl.high52w, low52w: wl.low52w,
-        latestVolume: wl.volume, avgVolume: wl.volume * 0.85, return6m: null
+        latestVolume: wl.volume, avgVolume: wl.volume * 0.85, return6m: null, closes: null
       };
     }
     const seed = hashSeed(item.symbol);
@@ -76,7 +84,7 @@ TH.pages = TH.pages || {};
     const currentPrice = nearHigh ? high52w * (0.965 + r4 * 0.035) : low52w + r4 * (high52w - low52w) * 0.85;
     const latestVolume = Math.round(200000 + r1 * 4000000);
     const avgVolume = Math.round(latestVolume * (0.6 + r2 * 0.5));
-    return { currentPrice, high52w, low52w, latestVolume, avgVolume, return6m: null };
+    return { currentPrice, high52w, low52w, latestVolume, avgVolume, return6m: null, closes: null, newHighBias: nearHigh };
   }
 
   function computeRSScores(rows) {
@@ -94,12 +102,15 @@ TH.pages = TH.pages || {};
       const volScore = r.volumeSurge != null ? clamp((r.volumeSurge - 1) * 100, 0, 100) : 0;
       const roeScore = clamp((r.roe / 35) * 100, 0, 100);
       const growthScore = clamp(((r.profitGrowthYoY + 10) / 50) * 100, 0, 100);
-      r.compositeScore = Math.round((closeness + rs + volScore + roeScore + growthScore) / 5);
+      let score = (closeness + rs + volScore + roeScore + growthScore) / 5;
+      if (r.isNewHigh) score = Math.min(100, score + 5); // small bonus for a genuine fresh breakout
+      r.compositeScore = Math.round(score);
     });
   }
 
   async function runScan(container) {
     state.scanning = true;
+    state.expanded = null;
     state.progress = { done: 0, total: TH.data.scanUniverse.length };
     renderBody(container);
 
@@ -115,6 +126,17 @@ TH.pages = TH.pages || {};
       const fund = demoFundamentals(item.symbol);
       const pctFromHigh = price.high52w ? ((price.currentPrice - price.high52w) / price.high52w) * 100 : null;
       const volumeSurge = price.avgVolume ? price.latestVolume / price.avgVolume : null;
+
+      // Breakout detection: is the latest price above every *prior* high in the window
+      // (i.e. a fresh 52-week high), rather than just sitting near an old peak?
+      let isNewHigh = false;
+      if (hist && hist.highs && hist.highs.length > 1) {
+        const priorHigh = Math.max.apply(null, hist.highs.slice(0, -1));
+        isNewHigh = price.currentPrice >= priorHigh;
+      } else if (!hist) {
+        isNewHigh = !!price.newHighBias;
+      }
+
       return Object.assign({}, item, {
         currentPrice: price.currentPrice,
         high52w: price.high52w,
@@ -122,6 +144,8 @@ TH.pages = TH.pages || {};
         pctFromHigh: pctFromHigh,
         volumeSurge: volumeSurge,
         return6m: price.return6m,
+        closes: price.closes || null,
+        isNewHigh: isNewHigh,
         live: !!hist
       }, fund);
     });
@@ -154,6 +178,7 @@ TH.pages = TH.pages || {};
     let rows = (state.rows || []).filter((r) => {
       if (th != null && (r.pctFromHigh == null || r.pctFromHigh < -th)) return false;
       if (state.sector !== "All" && r.sector !== state.sector) return false;
+      if (state.newHighOnly && !r.isNewHigh) return false;
       return true;
     });
     rows.sort((a, b) => {
@@ -166,6 +191,45 @@ TH.pages = TH.pages || {};
       return (av - bv) * dir;
     });
     return rows;
+  }
+
+  function renderDetailRow(r, colCount) {
+    const seriesId = "spark-" + r.symbol.replace(/[^a-zA-Z0-9]/g, "");
+    return `
+      <tr class="expand-row">
+        <td colspan="${colCount}" style="text-align:left;background:var(--panel-2);">
+          <div style="display:flex;gap:24px;flex-wrap:wrap;padding:12px 6px;">
+            <div style="flex:1;min-width:260px;">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;">
+                ${r.live ? "Live weekly price (1y) — dashed line = 52W high" : "No live chart data for this row (demo fallback)"}
+              </div>
+              <div id="${seriesId}"></div>
+            </div>
+            <div style="min-width:180px;">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;">Extra context</div>
+              <div style="font-size:12.5px;line-height:1.9;">
+                52W Low: <strong>${U.fmtNum(r.low52w)}</strong><br/>
+                Debt/Equity: <strong>${r.debtToEquity.toFixed(2)}</strong> <span style="color:var(--muted);">(demo)</span><br/>
+                P/E: <strong>${r.peRatio.toFixed(1)}</strong> <span style="color:var(--muted);">(demo)</span><br/>
+                Sales Growth YoY: <strong class="${U.changeClass(r.salesGrowthYoY)}">${U.fmtPct(r.salesGrowthYoY, 1)}</strong> <span style="color:var(--muted);">(demo)</span><br/>
+                6-Month Return: <strong class="${U.changeClass(r.return6m)}">${r.return6m != null ? U.fmtPct(r.return6m, 1) : "—"}</strong>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  function mountDetailCharts(host) {
+    if (!state.expanded || !state.rows) return;
+    const r = state.rows.find((x) => x.symbol === state.expanded);
+    if (!r || !r.closes || !r.closes.length) return;
+    const seriesId = "spark-" + r.symbol.replace(/[^a-zA-Z0-9]/g, "");
+    const el = host.querySelector("#" + seriesId);
+    if (!el) return;
+    const points = r.closes.map((c) => ({ y: c }));
+    TH.charts.priceLine(el, points, { height: 140, refValue: r.high52w });
   }
 
   function renderBody(container) {
@@ -185,6 +249,8 @@ TH.pages = TH.pages || {};
 
     const rows = getFilteredSorted();
     const liveCount = state.rows.filter((r) => r.live).length;
+    const newHighCount = state.rows.filter((r) => r.isNewHigh).length;
+    const colCount = 11;
 
     const cols = [
       { key: "display", label: "Symbol", align: "left" },
@@ -204,31 +270,37 @@ TH.pages = TH.pages || {};
       <th>Source</th>
     </tr>`;
 
-    const tbody = rows.map((r) => `
-      <tr>
-        <td class="left"><strong>${r.display}</strong><div style="color:var(--muted);font-size:11px;">${r.name}</div></td>
-        <td class="left">${r.sector}</td>
-        <td>${U.fmtNum(r.currentPrice)}</td>
-        <td>${U.fmtNum(r.high52w)}</td>
-        <td class="${r.pctFromHigh >= -0.5 ? "up" : ""}">${r.pctFromHigh != null ? U.fmtPct(r.pctFromHigh, 1) : "—"}</td>
-        <td>${r.rsScore}${r.rsLive ? "" : "*"}</td>
-        <td>${r.volumeSurge != null ? r.volumeSurge.toFixed(2) + "x" : "—"}</td>
-        <td>${r.roe.toFixed(1)}</td>
-        <td class="${U.changeClass(r.profitGrowthYoY)}">${U.fmtPct(r.profitGrowthYoY, 1)}</td>
-        <td><strong>${r.compositeScore}</strong></td>
-        <td><span class="badge ${r.live ? "badge-live" : "badge-demo"}" style="font-size:10px;">${r.live ? "LIVE" : "DEMO"}</span></td>
-      </tr>
-    `).join("");
+    const tbody = rows.map((r) => {
+      const mainRow = `
+        <tr class="scan-row" data-symbol="${r.symbol}" style="cursor:pointer;">
+          <td class="left">
+            <strong>${r.display}</strong> ${r.isNewHigh ? `<span class="pill pill-stage2" title="Fresh 52-week high">NEW HIGH</span>` : ""}
+            <div style="color:var(--muted);font-size:11px;">${r.name}</div>
+          </td>
+          <td class="left">${r.sector}</td>
+          <td>${U.fmtNum(r.currentPrice)}</td>
+          <td>${U.fmtNum(r.high52w)}</td>
+          <td class="${r.pctFromHigh != null && r.pctFromHigh >= -0.5 ? "up" : ""}">${r.pctFromHigh != null ? U.fmtPct(r.pctFromHigh, 1) : "—"}</td>
+          <td>${r.rsScore}${r.rsLive ? "" : "*"}</td>
+          <td>${r.volumeSurge != null ? r.volumeSurge.toFixed(2) + "x" : "—"}</td>
+          <td>${r.roe.toFixed(1)}</td>
+          <td class="${U.changeClass(r.profitGrowthYoY)}">${U.fmtPct(r.profitGrowthYoY, 1)}</td>
+          <td><strong>${r.compositeScore}</strong></td>
+          <td><span class="badge ${r.live ? "badge-live" : "badge-demo"}" style="font-size:10px;">${r.live ? "LIVE" : "DEMO"}</span></td>
+        </tr>
+      `;
+      return state.expanded === r.symbol ? mainRow + renderDetailRow(r, colCount) : mainRow;
+    }).join("");
 
     host.innerHTML = `
       <div class="note">
         Scanned ${state.rows.length} stocks — <strong class="up">${liveCount} live</strong>, ${state.rows.length - liveCount} on demo fallback data (fetch failed or rate-limited).
-        Last scan: ${state.lastScanAt ? state.lastScanAt.toLocaleTimeString("en-IN") : "—"}.
-        RS Score marked <strong>*</strong> is demo (no live history for that row). ROE/Profit Growth are always demo — see file header for why.
+        <strong class="up">${newHighCount} at a fresh 52-week high</strong> right now. Last scan: ${state.lastScanAt ? state.lastScanAt.toLocaleTimeString("en-IN") : "—"}.
+        RS Score marked <strong>*</strong> is demo (no live history for that row). ROE/Profit Growth are always demo — see file header for why. Click a row for a mini chart and more detail.
       </div>
       <div class="card">
         <div class="table-wrap">
-          <table><thead>${thead}</thead><tbody>${tbody || `<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:24px;">No stocks match this filter</td></tr>`}</tbody></table>
+          <table><thead>${thead}</thead><tbody>${tbody || `<tr><td colspan="${colCount}" style="text-align:center;color:var(--muted);padding:24px;">No stocks match this filter</td></tr>`}</tbody></table>
         </div>
       </div>
     `;
@@ -241,6 +313,16 @@ TH.pages = TH.pages || {};
         renderBody(container);
       });
     });
+
+    host.querySelectorAll("tr.scan-row").forEach((tr) => {
+      tr.addEventListener("click", () => {
+        const sym = tr.getAttribute("data-symbol");
+        state.expanded = state.expanded === sym ? null : sym;
+        renderBody(container);
+      });
+    });
+
+    mountDetailCharts(host);
   }
 
   function render(container) {
@@ -252,7 +334,7 @@ TH.pages = TH.pages || {};
           <h1 class="page-title">52-Week High Scanner</h1>
           <div class="page-sub">Stocks at/near their 52-week high, ranked on 3 live technical + 2 fundamental parameters</div>
         </div>
-        <button class="btn" id="scanBtn">Scan Now</button>
+        <button class="btn" id="scanBtn">Rescan</button>
       </div>
 
       <div class="toolbar">
@@ -264,10 +346,11 @@ TH.pages = TH.pages || {};
           <option value="all">Show all (no threshold)</option>
         </select>
         <select id="scanSector">${sectors.map((s) => `<option value="${s}">${s}</option>`).join("")}</select>
+        <div class="chip" id="scanNewHighToggle">🔺 Fresh breakouts only</div>
       </div>
 
       <div class="note">
-        NSE/BSE block direct browser scanning (no CORS, bot-detection), so this pulls ~1 year of price history per stock straight from Yahoo Finance for a 50-stock NSE universe instead. <strong>% From High</strong>, <strong>RS Score</strong> and <strong>Vol Surge</strong> are computed from that live data; <strong>ROE</strong> and <strong>Profit Growth</strong> are demo placeholders since free live fundamentals aren't available — swap in a real fundamentals vendor in <code>scan52w.js</code> when you have one.
+        <strong>Strategy:</strong> stocks making genuine new 52-week highs tend to keep outperforming for a while — the market is often slow to price in the good news behind the breakout. NSE/BSE block direct browser scanning (no CORS, bot-detection), so this pulls ~1 year of weekly price history per stock straight from Yahoo Finance for a 50-stock NSE universe instead. <strong>% From High</strong>, <strong>RS Score</strong>, <strong>Vol Surge</strong> and the <strong>NEW HIGH</strong> flag are computed from that live data; <strong>ROE</strong> and <strong>Profit Growth</strong> are demo placeholders since free live fundamentals aren't available — swap in a real fundamentals vendor in <code>scan52w.js</code> when you have one.
       </div>
 
       <div id="scanBody"></div>
@@ -276,8 +359,20 @@ TH.pages = TH.pages || {};
     container.querySelector("#scanBtn").addEventListener("click", () => runScan(container));
     container.querySelector("#scanThreshold").addEventListener("change", (e) => { state.threshold = e.target.value; renderBody(container); });
     container.querySelector("#scanSector").addEventListener("change", (e) => { state.sector = e.target.value; renderBody(container); });
+    const newHighChip = container.querySelector("#scanNewHighToggle");
+    newHighChip.addEventListener("click", () => {
+      state.newHighOnly = !state.newHighOnly;
+      newHighChip.classList.toggle("active", state.newHighOnly);
+      renderBody(container);
+    });
 
     renderBody(container);
+
+    // Auto-run the first scan on first visit so the page isn't empty by default.
+    if (!state.rows && !state.scanning && !state.autoScanTried) {
+      state.autoScanTried = true;
+      runScan(container);
+    }
   }
 
   TH.pages.scan52w = { render: render };

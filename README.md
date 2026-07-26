@@ -24,7 +24,7 @@ Then open the printed local address.
 - **Equity Screener** — sortable, filterable table (sector, stage, RS rating, watchlist star) over a sample 18-stock universe.
 - **Option Chain & Analytics** — synthetic option chain per underlying (NIFTY/BANKNIFTY/RELIANCE/TCS), PCR, and an interactive single-leg payoff diagram.
 - **Bonds & Portfolio** — bond tracker table, a YTM calculator, and a cross-asset (equity/bond/option) holdings table with P&L and allocation chart.
-- **52-Week High Scanner** — screens a 50-stock NSE universe for stocks at/near their 52-week high, scored on 3 live technical parameters (% from 52W high, RS score vs. the universe, volume surge) computed from real Yahoo Finance price history, plus 2 demo fundamental parameters (ROE, YoY profit growth).
+- **52-Week High Scanner** — screens a 50-stock NSE universe for stocks at/near their 52-week high, scored on 3 live technical parameters (% from 52W high, RS score vs. the universe, volume surge) computed from real Yahoo Finance price history, plus 2 demo fundamental parameters (ROE, YoY profit growth). Auto-scans on first visit and caches results; flags genuine breakouts (NEW HIGH — price above every prior high in the window, not just sitting near an old peak) with a filter for "fresh breakouts only"; click a row to expand a live mini price chart plus extra context (52W low, debt/equity, P/E, sales growth, 6-month return).
 
 ## Live data
 
@@ -58,15 +58,17 @@ screener.js      Equity screener page module (TH.pages.screener)
 options.js       Option chain & payoff page module (TH.pages.options)
 bonds.js         Bonds + portfolio page module (TH.pages.bonds)
 scan52w.js       52-Week High Scanner page module (TH.pages.scan52w)
-app.js           Auth gating, routing between pages, sidebar/topbar behavior
+app.js           Routing between pages, sidebar/topbar behavior, optional auth modal wiring
 ```
 
-## Authentication setup (email + Google sign-in)
+## Authentication setup (optional — email/password + Google)
 
-Sign-in is required to see the dashboard, backed by [Supabase Auth](https://supabase.com) —
-free tier, no server of your own needed, works fine from a static GitHub Pages site. Until
-you configure it, the app shows a "continue without signing in" screen instead of hard-locking
-you out.
+Sign-in is **optional**: the dashboard loads and works with no account at all. A "Sign in"
+button in the topbar opens a dismissible modal with user ID (email) + password sign-up/sign-in
+and a Google button; once signed in, the button is replaced by an avatar/email menu with
+Sign out. It's backed by [Supabase Auth](https://supabase.com) — free tier, no server of your
+own needed, works fine from a static GitHub Pages site. Until you configure it, clicking
+"Sign in" just shows a short "not set up yet" notice.
 
 **1. Create the Supabase project**
 - Go to supabase.com → sign in → "New project." Pick a name, a database password (save it somewhere), and a region. Wait ~2 minutes for it to provision.

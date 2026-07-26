@@ -1,12 +1,10 @@
-/* TradeHub — app shell: auth gating, routing between pages, sidebar/topbar behavior, live clock & badge. */
+/* TradeHub — app shell: routing between pages, sidebar/topbar behavior, live clock & badge,
+   and optional sign-in (dashboard works without an account; the auth modal is opt-in). */
 window.TH = window.TH || {};
 
 (function () {
   let currentStop = null;
   let liveBadgeEl, clockEl, sidebarEl, overlayEl;
-  let shellBound = false;
-  let pagesShown = false;
-  let clockTimer = null;
 
   function setLive(isLive) {
     if (!liveBadgeEl) return;
@@ -55,19 +53,43 @@ window.TH = window.TH || {};
     window.scrollTo(0, 0);
   }
 
-  function updateUserMenu(session) {
+  // ---- Optional auth: sign-in button <-> user menu, modal open/close ----
+
+  function updateAuthUI(session) {
+    const signInBtn = document.getElementById("signInBtn");
+    const userMenuWrap = document.getElementById("userMenuWrap");
     const avatar = document.getElementById("userAvatar");
     const emailEl = document.getElementById("userMenuEmail");
-    if (!avatar) return;
-    const email = session && session.user ? (session.user.email || "") : "";
-    avatar.textContent = email ? email[0].toUpperCase() : "?";
-    avatar.title = email || "Not signed in (setup mode)";
-    if (emailEl) emailEl.textContent = email || "Not signed in — auth not configured yet";
+    const signedIn = !!(session && session.user);
+
+    if (signInBtn) signInBtn.style.display = signedIn ? "none" : "";
+    if (userMenuWrap) userMenuWrap.style.display = signedIn ? "" : "none";
+
+    if (signedIn && avatar) {
+      const email = session.user.email || "";
+      avatar.textContent = email ? email[0].toUpperCase() : "U";
+      avatar.title = email;
+      if (emailEl) emailEl.textContent = email;
+    }
   }
 
-  function bindShellOnce() {
-    if (shellBound) return;
-    shellBound = true;
+  function openAuthModal() {
+    const el = document.getElementById("authScreen");
+    if (!el) return;
+    el.classList.add("open");
+    if (TH.authUI) TH.authUI.render();
+  }
+
+  function closeAuthModal() {
+    const el = document.getElementById("authScreen");
+    if (el) el.classList.remove("open");
+  }
+
+  function init() {
+    liveBadgeEl = document.getElementById("liveBadge");
+    clockEl = document.getElementById("clock");
+    sidebarEl = document.getElementById("sidebar");
+    overlayEl = document.getElementById("sidebar-overlay");
 
     document.querySelectorAll(".nav-item").forEach((btn) => {
       btn.addEventListener("click", () => showPage(btn.getAttribute("data-page")));
@@ -81,6 +103,9 @@ window.TH = window.TH || {};
       sidebarEl.classList.remove("open");
       overlayEl.classList.remove("open");
     });
+
+    const signInBtn = document.getElementById("signInBtn");
+    if (signInBtn) signInBtn.addEventListener("click", openAuthModal);
 
     const avatar = document.getElementById("userAvatar");
     const dropdown = document.getElementById("userMenuDropdown");
@@ -97,54 +122,35 @@ window.TH = window.TH || {};
       signOutBtn.addEventListener("click", async () => {
         if (TH.auth && TH.auth.isConfigured()) {
           try { await TH.auth.signOut(); } catch (e) { console.error(e); }
-        } else {
-          hideApp();
         }
+        updateAuthUI(null);
       });
     }
-  }
 
-  function revealApp(session) {
-    document.getElementById("authScreen").style.display = "none";
-    document.getElementById("appRoot").style.display = "";
-    bindShellOnce();
-    updateUserMenu(session);
-    if (!clockTimer) { tickClock(); clockTimer = setInterval(tickClock, 1000); }
-    if (!pagesShown) { pagesShown = true; showPage("dashboard"); }
-  }
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAuthModal(); });
 
-  function hideApp() {
-    if (typeof currentStop === "function") { currentStop(); currentStop = null; }
-    document.getElementById("appRoot").style.display = "none";
-    document.getElementById("authScreen").style.display = "";
-    if (TH.authUI) TH.authUI.render();
-  }
-
-  function init() {
-    liveBadgeEl = document.getElementById("liveBadge");
-    clockEl = document.getElementById("clock");
-    sidebarEl = document.getElementById("sidebar");
-    overlayEl = document.getElementById("sidebar-overlay");
+    // Dashboard is visible immediately — sign-in is opt-in, not a gate.
+    tickClock();
+    setInterval(tickClock, 1000);
+    showPage("dashboard");
 
     if (TH.auth && TH.auth.isConfigured()) {
       TH.auth.onAuthStateChange((session) => {
-        if (session) revealApp(session);
-        else hideApp();
+        updateAuthUI(session);
+        if (session) closeAuthModal();
       });
-      TH.auth.getSession().then((session) => {
-        if (session) revealApp(session);
-        else if (TH.authUI) TH.authUI.render();
-      });
-    } else if (TH.authUI) {
-      // Not configured — show the setup notice with a "continue without signing in" escape hatch.
-      TH.authUI.render();
+      TH.auth.getSession().then((session) => updateAuthUI(session));
     } else {
-      // auth-ui.js missing entirely; fail open so the dashboard still loads.
-      revealApp(null);
+      updateAuthUI(null);
     }
   }
 
-  TH.app = { setLive: setLive, showPage: showPage, revealApp: revealApp, hideApp: hideApp };
+  TH.app = {
+    setLive: setLive,
+    showPage: showPage,
+    openAuthModal: openAuthModal,
+    closeAuthModal: closeAuthModal
+  };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

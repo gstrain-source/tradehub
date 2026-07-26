@@ -1,7 +1,8 @@
-/* TradeHub — login / sign-up screen. Renders into #authScreen.
+/* TradeHub — login / sign-up screen. Renders into #authScreen as a dismissible modal
+   (sign-in is optional — the dashboard is usable without it).
    Talks only to TH.auth — once a sign-in/sign-up call succeeds, TH.auth's onAuthStateChange
-   listener (wired up in app.js) is what actually reveals the dashboard. This file just owns
-   the form UI, validation, and error/loading states. */
+   listener (wired up in app.js) is what updates the topbar and closes this modal. This file
+   just owns the form UI, validation, and error/loading states. */
 window.TH = window.TH || {};
 
 (function () {
@@ -16,6 +17,10 @@ window.TH = window.TH || {};
     </svg>`;
   }
 
+  function closeModal() {
+    if (TH.app && TH.app.closeAuthModal) TH.app.closeAuthModal();
+  }
+
   function render() {
     const host = document.getElementById("authScreen");
     if (!host) return;
@@ -24,22 +29,24 @@ window.TH = window.TH || {};
       host.innerHTML = `
         <div class="auth-wrap">
           <div class="auth-card">
+            <button class="auth-close" id="authCloseBtn" aria-label="Close">&times;</button>
             <div class="auth-brand"><span class="brand-mark">TH</span><span class="brand-name">TradeHub</span></div>
             <h1 class="auth-title">Auth isn't set up yet</h1>
-            <p class="auth-sub">Add your Supabase project URL and anon key to <code>auth-config.js</code> to turn on email &amp; Google sign-in. Until then you can preview the dashboard without logging in.</p>
-            <button class="btn" id="authSkipBtn" style="width:100%;margin-top:10px;">Continue without signing in</button>
+            <p class="auth-sub">Add your Supabase project URL and anon key to <code>auth-config.js</code> to turn on sign-in.</p>
+            <button class="btn" id="authSkipBtn" style="width:100%;margin-top:10px;">Close</button>
           </div>
         </div>
       `;
-      host.querySelector("#authSkipBtn").addEventListener("click", () => {
-        if (TH.app && TH.app.revealApp) TH.app.revealApp(null);
-      });
+      host.querySelector("#authSkipBtn").addEventListener("click", closeModal);
+      host.querySelector("#authCloseBtn").addEventListener("click", closeModal);
+      host.querySelector(".auth-wrap").addEventListener("click", (e) => { if (e.target.id === "authScreen" || e.target.classList.contains("auth-wrap")) closeModal(); });
       return;
     }
 
     host.innerHTML = `
       <div class="auth-wrap">
         <div class="auth-card">
+          <button class="auth-close" id="authCloseBtn" aria-label="Close">&times;</button>
           <div class="auth-brand"><span class="brand-mark">TH</span><span class="brand-name">TradeHub</span></div>
 
           <div class="auth-tabs">
@@ -48,10 +55,10 @@ window.TH = window.TH || {};
           </div>
 
           <button class="btn-google" id="googleBtn">${googleIcon()}Continue with Google</button>
-          <div class="auth-divider"><span>or with email</span></div>
+          <div class="auth-divider"><span>or with user ID &amp; password</span></div>
 
           <form id="authForm">
-            <div class="form-row"><label>Email</label><input type="email" id="authEmail" required autocomplete="email" /></div>
+            <div class="form-row"><label>Email (used as your user ID)</label><input type="email" id="authEmail" required autocomplete="email" /></div>
             <div class="form-row"><label>Password</label><input type="password" id="authPassword" required minlength="6" autocomplete="${state.mode === "signup" ? "new-password" : "current-password"}" /></div>
             ${state.error ? `<div class="auth-msg auth-msg-error">${TH.util.escapeHtml(state.error)}</div>` : ""}
             ${state.info ? `<div class="auth-msg auth-msg-info">${TH.util.escapeHtml(state.info)}</div>` : ""}
@@ -66,6 +73,9 @@ window.TH = window.TH || {};
         </div>
       </div>
     `;
+
+    host.querySelector("#authCloseBtn").addEventListener("click", closeModal);
+    host.querySelector(".auth-wrap").addEventListener("click", (e) => { if (e.target.classList.contains("auth-wrap")) closeModal(); });
 
     host.querySelectorAll(".auth-tab").forEach((btn) => {
       btn.addEventListener("click", () => { state.mode = btn.getAttribute("data-mode"); state.error = ""; state.info = ""; render(); });
@@ -98,7 +108,7 @@ window.TH = window.TH || {};
       try {
         if (state.mode === "signin") {
           await TH.auth.signInWithEmail(email, password);
-          // onAuthStateChange listener in app.js reveals the app from here
+          // onAuthStateChange listener in app.js updates the topbar & closes this modal
         } else {
           const result = await TH.auth.signUpWithEmail(email, password);
           state.loading = false;
