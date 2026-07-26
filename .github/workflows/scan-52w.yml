@@ -7,5 +7,5 @@ $ jobs:
 $ scan:
 $ runs-on: ubuntu-latest
 $ steps:
-$ - run: curl "${{ secrets.https://hhvtlzrvvarytohmxqld.supabase.co/functions/v1/scan-52w-high?secret=tradehubcoding }}?secret=${{
-secrets.SCAN_SECRET }}"
+$ - run: curl "${{ secrets.https://hhvtlzrvvarytohmxqld.supabase.co/functions/v1/scan-52w-high?secret=tradehubcoding }}?secret=${{secrets.SCAN_SECRET }}"
+
