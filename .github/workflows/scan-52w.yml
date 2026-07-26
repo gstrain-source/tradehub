@@ -1,0 +1,12 @@
+$ name: Daily 52-week-high scan
+$ on:
+$ schedule:
+$ - cron: '30 3 * * *' # ~9:00am IST daily; adjust as needed
+$ workflow_dispatch: {} # lets you also trigger it manually from the Actions
+tab
+$ jobs:
+$ scan:
+$ runs-on: ubuntu-latest
+$ steps:
+$ - run: curl "${{ secrets.https://hhvtlzrvvarytohmxqld.supabase.co/functions/v1/scan-52w-high?secret=tradehubcoding }}?secret=${{
+secrets.SCAN_SECRET }}"
